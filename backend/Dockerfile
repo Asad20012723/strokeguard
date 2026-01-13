@@ -7,15 +7,18 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update --fix-missing && \
+    apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
-    libxrender-dev \
-    libgl1-mesa-glx \
+    libxrender1 \
+    libgl1 \
     curl \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
