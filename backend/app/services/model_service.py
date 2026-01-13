@@ -79,7 +79,7 @@ class ModelService:
 
     def load(self) -> None:
         """Load the model from disk."""
-        self.model = load_model(self.model_path, self.device, legacy=True)
+        self.model = load_model(self.model_path, self.device)
 
     def is_loaded(self) -> bool:
         """Check if model is loaded."""
