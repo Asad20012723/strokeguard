@@ -1,0 +1,80 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.egg-info/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Model files in root (keep backend/models/)
+/multimodal_model.pth
+
+# Data files
+*.xlsx
+*.csv
+*.json.bak
+
+# Training data - exclude from repo
+Neuroface_Stroke/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# PDF documents
+*.pdf
+
+# Training/development scripts
+fix_*.py
+update_*.py
+stroke_monitoring_system.py
+training_plots.png
+
+# Docker
+.docker/
+
+# Vercel
+.vercel
+
+# Next.js
+.next/
+out/
+
+# Misc
+*.bak
+*.tmp
+
+# Claude
+.claude/
