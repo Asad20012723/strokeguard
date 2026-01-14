@@ -23,6 +23,8 @@ from app.models.schemas import (
     GenerateReportRequest,
     GenerateReportResponse,
     RiskLevel,
+    AIInterpretation,
+    AIInterpretationSection,
 )
 
 router = APIRouter()
@@ -345,6 +347,68 @@ async def predict_dual_model(
                 seen.add(rec)
                 unique_recommendations.append(rec)
 
+        # ===== n8n AI Expert Interpretation =====
+        ai_interpretation = None
+        interpretation_source = "none"
+        fallback_used = False
+        fallback_reason = None
+
+        try:
+            # Prepare multimodal results dict for n8n
+            multimodal_dict = None
+            if multimodal_response:
+                multimodal_dict = {
+                    "risk_score": multimodal_response.risk_score,
+                    "risk_level": multimodal_response.risk_level.value if hasattr(multimodal_response.risk_level, 'value') else str(multimodal_response.risk_level),
+                    "confidence": multimodal_response.confidence,
+                }
+
+            # Get SHAP/LIME explanations if available
+            shap_data = None
+            lime_data = None
+            if multimodal_response and multimodal_response.explainability:
+                shap_data = multimodal_response.explainability.shap_values
+                lime_data = multimodal_response.explainability.lime_tabular
+
+            # Send to n8n for AI interpretation
+            n8n_response = await n8n_service.send_for_interpretation(
+                patient_id=patient_id,
+                clinical_data=health_dict,
+                logistic_results=stat_result,
+                multimodal_results=multimodal_dict,
+                shap_explanations=shap_data,
+                lime_explanations=lime_data,
+                image_provided=image_provided
+            )
+
+            if n8n_response.get("success"):
+                interpretation_data = n8n_response.get("interpretation", {})
+                interpretation_source = n8n_response.get("source", "unknown")
+                fallback_used = n8n_response.get("fallback_used", False)
+                fallback_reason = n8n_response.get("fallback_reason")
+
+                # Convert sections to schema format
+                sections = []
+                for section in interpretation_data.get("sections", []):
+                    sections.append(AIInterpretationSection(
+                        title=section.get("title", ""),
+                        content=section.get("content", "")
+                    ))
+
+                ai_interpretation = AIInterpretation(
+                    risk_score=interpretation_data.get("risk_score", combined_risk_score),
+                    risk_level=interpretation_data.get("risk_level", combined_risk_level.value),
+                    sections=sections,
+                    generated_by=interpretation_data.get("generated_by", interpretation_source),
+                    timestamp=interpretation_data.get("timestamp", "")
+                )
+
+        except Exception as e:
+            # If n8n call fails, continue without AI interpretation
+            print(f"n8n interpretation error (non-blocking): {e}")
+            interpretation_source = "error"
+            fallback_reason = str(e)
+
         total_time = (time.time() - total_start) * 1000
 
         return DualModelPredictionResponse(
@@ -355,6 +419,10 @@ async def predict_dual_model(
             combined_risk_score=combined_risk_score,
             combined_risk_level=combined_risk_level,
             recommendations=unique_recommendations,
+            ai_interpretation=ai_interpretation,
+            interpretation_source=interpretation_source,
+            fallback_used=fallback_used,
+            fallback_reason=fallback_reason,
             total_processing_time_ms=total_time,
         )
 

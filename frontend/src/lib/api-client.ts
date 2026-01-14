@@ -110,6 +110,21 @@ export interface DualModelPredictionRequest {
   include_explainability?: boolean
 }
 
+// ======================= AI Interpretation Types =======================
+
+export interface AIInterpretationSection {
+  title: string
+  content: string
+}
+
+export interface AIInterpretation {
+  risk_score: number
+  risk_level: string
+  sections: AIInterpretationSection[]
+  generated_by: string // 'n8n_ai_agent' | 'rule_based_system'
+  timestamp: string
+}
+
 export interface DualModelPredictionResponse {
   patient_id: string
   image_provided: boolean
@@ -118,6 +133,11 @@ export interface DualModelPredictionResponse {
   combined_risk_score: number
   combined_risk_level: 'low' | 'moderate' | 'high'
   recommendations: string[]
+  // AI Expert Interpretation
+  ai_interpretation: AIInterpretation | null
+  interpretation_source: string // 'n8n_ai_agent' | 'rule_based_fallback' | 'none' | 'error'
+  fallback_used: boolean
+  fallback_reason: string | null
   total_processing_time_ms: number
 }
 

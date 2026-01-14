@@ -281,6 +281,25 @@ class DualModelPredictionRequest(BaseModel):
     )
 
 
+class AIInterpretationSection(BaseModel):
+    """A section of the AI interpretation."""
+
+    title: str = Field(..., description="Section title")
+    content: str = Field(..., description="Section content")
+
+
+class AIInterpretation(BaseModel):
+    """AI-generated medical interpretation from n8n."""
+
+    risk_score: float = Field(..., description="Risk score")
+    risk_level: str = Field(..., description="Risk level")
+    sections: List[AIInterpretationSection] = Field(
+        default_factory=list, description="Interpretation sections"
+    )
+    generated_by: str = Field(..., description="Source: n8n_ai_agent or rule_based_system")
+    timestamp: str = Field(..., description="Generation timestamp")
+
+
 class DualModelPredictionResponse(BaseModel):
     """Combined response from both statistical and multimodal models."""
 
@@ -307,6 +326,21 @@ class DualModelPredictionResponse(BaseModel):
     recommendations: List[str] = Field(
         default_factory=list, description="Combined recommendations"
     )
+
+    # AI Expert Interpretation (from n8n or rule-based fallback)
+    ai_interpretation: Optional[AIInterpretation] = Field(
+        None, description="AI-generated medical interpretation"
+    )
+    interpretation_source: str = Field(
+        default="none", description="Source: n8n_ai_agent, rule_based_fallback, or none"
+    )
+    fallback_used: bool = Field(
+        default=False, description="Whether rule-based fallback was used"
+    )
+    fallback_reason: Optional[str] = Field(
+        None, description="Reason for fallback if used"
+    )
+
     total_processing_time_ms: float = Field(
         ..., description="Total processing time"
     )
