@@ -5,11 +5,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    expose:
+      - "8000"
     ports:
       - "8000:8000"
     environment:
-      - DEBUG=true
-      - CORS_ORIGINS=["http://localhost:3000"]
+      - DEBUG=false
+      - CORS_ORIGINS=["http://localhost:3000","https://strokeguard.analytiqe.com","https://strokeguard.vercel.app","https://*.vercel.app"]
       - MODEL_DEVICE=cpu
       - MODEL_PATH=./models/multimodal_model.pth
     volumes:
@@ -21,20 +23,19 @@ services:
       retries: 3
       start_period: 120s
     restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.strokeguard-api.rule=Host(`api.strokeguard.analytiqe.com`)"
+      - "traefik.http.routers.strokeguard-api.entrypoints=websecure"
+      - "traefik.http.routers.strokeguard-api.tls=true"
+      - "traefik.http.routers.strokeguard-api.tls.certresolver=le"
+      - "traefik.http.services.strokeguard-api.loadbalancer.server.port=8000"
+    networks:
+      - n8n_default
+      - default
 
 networks:
+  n8n_default:
+    external: true
   default:
     driver: bridge
