@@ -15,7 +15,7 @@ import { GenerateReportButton } from '@/components/results/GenerateReportButton'
 import { ArrowLeft, Download, Share2, Clock, Calculator, Camera, Bot, AlertTriangle } from 'lucide-react'
 import type { DualModelPredictionResponse, HealthData, ImageData, AIInterpretation } from '@/lib/api-client'
 
-interface ExtendedResult extends DualModelPredictionResponse {
+interface ExtendedResult extends Omit<DualModelPredictionResponse, 'ai_interpretation' | 'interpretation_source' | 'fallback_used' | 'fallback_reason'> {
   // Legacy fields for backwards compatibility
   risk_score?: number
   risk_level?: 'low' | 'moderate' | 'high'
