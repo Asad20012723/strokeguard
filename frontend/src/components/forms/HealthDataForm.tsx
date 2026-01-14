@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -84,11 +84,11 @@ export function HealthDataForm({ initialData, onNext, showSkipOption = false }: 
 
             <div className="space-y-2">
               <Label htmlFor="gender">Gender</Label>
-              <Select id="gender" {...register('gender')}>
+              <NativeSelect id="gender" {...register('gender')}>
                 <option value="">Select gender</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
-              </Select>
+              </NativeSelect>
               {errors.gender && (
                 <p className="text-sm text-destructive">{errors.gender.message}</p>
               )}
@@ -171,11 +171,11 @@ export function HealthDataForm({ initialData, onNext, showSkipOption = false }: 
 
             <div className="space-y-2">
               <Label htmlFor="smoking">Smoking Status</Label>
-              <Select id="smoking" {...register('smoking')}>
+              <NativeSelect id="smoking" {...register('smoking')}>
                 <option value="0">Never Smoked</option>
                 <option value="1">Former Smoker</option>
                 <option value="2">Current Smoker</option>
-              </Select>
+              </NativeSelect>
               {errors.smoking && (
                 <p className="text-sm text-destructive">{errors.smoking.message}</p>
               )}
