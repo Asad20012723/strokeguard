@@ -15,23 +15,27 @@ import { GenerateReportButton } from '@/components/results/GenerateReportButton'
 import { ArrowLeft, Download, Share2, Clock, Calculator, Camera, Bot, AlertTriangle } from 'lucide-react'
 import type { DualModelPredictionResponse, HealthData, ImageData, AIInterpretation } from '@/lib/api-client'
 
-interface ExtendedResult extends Omit<DualModelPredictionResponse, 'ai_interpretation' | 'interpretation_source' | 'fallback_used' | 'fallback_reason'> {
-  // Legacy fields for backwards compatibility
-  risk_score?: number
-  risk_level?: 'low' | 'moderate' | 'high'
-  confidence?: number
-  contributing_factors?: Array<{
+// Legacy result format (without dual model)
+interface LegacyResult {
+  risk_score: number
+  risk_level: 'low' | 'moderate' | 'high'
+  confidence: number
+  contributing_factors: Array<{
     factor: string
     value: number
     threshold: number
     severity: 'low' | 'moderate' | 'high'
   }>
-  processing_time_ms?: number
-  // AI interpretation fields (may be undefined in legacy responses)
-  ai_interpretation?: AIInterpretation | null
-  interpretation_source?: string
-  fallback_used?: boolean
-  fallback_reason?: string | null
+  recommendations: string[]
+  processing_time_ms: number
+}
+
+// Combined type that can be either legacy or dual-model response
+type ExtendedResult = DualModelPredictionResponse | LegacyResult
+
+// Type guard to check if result is dual-model format
+function isDualModelResult(result: ExtendedResult): result is DualModelPredictionResponse {
+  return 'statistical_results' in result
 }
 
 export default function ResultsPage() {
@@ -80,17 +84,17 @@ export default function ResultsPage() {
   }
 
   // Handle both new dual-model format and legacy format
-  const isDualModel = 'statistical_results' in result
-  const riskScore = isDualModel ? result.combined_risk_score : (result.risk_score || 0)
-  const riskLevel = isDualModel ? result.combined_risk_level : (result.risk_level || 'low')
-  const processingTime = isDualModel ? result.total_processing_time_ms : (result.processing_time_ms || 0)
-  const recommendations = isDualModel ? result.recommendations : (result.recommendations || [])
+  const isDualModel = isDualModelResult(result)
+  const riskScore = isDualModel ? result.combined_risk_score : result.risk_score
+  const riskLevel = isDualModel ? result.combined_risk_level : result.risk_level
+  const processingTime = isDualModel ? result.total_processing_time_ms : result.processing_time_ms
+  const recommendations = result.recommendations
   const confidence = isDualModel
     ? (result.multimodal_results?.confidence || 0.7)
-    : (result.confidence || 0.7)
+    : result.confidence
   const contributingFactors = isDualModel
     ? (result.multimodal_results?.contributing_factors || [])
-    : (result.contributing_factors || [])
+    : result.contributing_factors
 
   // Get health data for report generation (from session if available)
   const healthData: HealthData = {
