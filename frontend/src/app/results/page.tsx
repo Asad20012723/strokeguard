@@ -5,21 +5,45 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RiskGauge } from '@/components/results/RiskGauge'
 import { RiskFactors } from '@/components/results/RiskFactors'
 import { Recommendations } from '@/components/results/Recommendations'
-import { ArrowLeft, Download, Share2, Clock } from 'lucide-react'
-import type { AssessmentResult } from '@/types'
+import { ClinicalEvidence } from '@/components/results/ClinicalEvidence'
+import { GenerateReportButton } from '@/components/results/GenerateReportButton'
+import { ArrowLeft, Download, Share2, Clock, Calculator, Camera } from 'lucide-react'
+import type { DualModelPredictionResponse, HealthData, ImageData } from '@/lib/api-client'
+
+interface ExtendedResult extends DualModelPredictionResponse {
+  // Legacy fields for backwards compatibility
+  risk_score?: number
+  risk_level?: 'low' | 'moderate' | 'high'
+  confidence?: number
+  contributing_factors?: Array<{
+    factor: string
+    value: number
+    threshold: number
+    severity: 'low' | 'moderate' | 'high'
+  }>
+  processing_time_ms?: number
+}
 
 export default function ResultsPage() {
   const router = useRouter()
-  const [result, setResult] = useState<AssessmentResult | null>(null)
+  const [result, setResult] = useState<ExtendedResult | null>(null)
+  const [assessmentMode, setAssessmentMode] = useState<'statistical' | 'multimodal'>('multimodal')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const storedResult = sessionStorage.getItem('assessmentResult')
+    const storedMode = sessionStorage.getItem('assessmentMode')
+
     if (storedResult) {
       setResult(JSON.parse(storedResult))
+    }
+    if (storedMode) {
+      setAssessmentMode(storedMode as 'statistical' | 'multimodal')
     }
     setLoading(false)
   }, [])
@@ -50,6 +74,31 @@ export default function ResultsPage() {
     )
   }
 
+  // Handle both new dual-model format and legacy format
+  const isDualModel = 'statistical_results' in result
+  const riskScore = isDualModel ? result.combined_risk_score : (result.risk_score || 0)
+  const riskLevel = isDualModel ? result.combined_risk_level : (result.risk_level || 'low')
+  const processingTime = isDualModel ? result.total_processing_time_ms : (result.processing_time_ms || 0)
+  const recommendations = isDualModel ? result.recommendations : (result.recommendations || [])
+  const confidence = isDualModel
+    ? (result.multimodal_results?.confidence || 0.7)
+    : (result.confidence || 0.7)
+  const contributingFactors = isDualModel
+    ? (result.multimodal_results?.contributing_factors || [])
+    : (result.contributing_factors || [])
+
+  // Get health data for report generation (from session if available)
+  const healthData: HealthData = {
+    age: 55,
+    gender: 'male',
+    systolic: 130,
+    diastolic: 80,
+    glucose: 110,
+    bmi: 26,
+    cholesterol: 200,
+    smoking: 0,
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Header */}
@@ -63,83 +112,227 @@ export default function ResultsPage() {
             New Assessment
           </Link>
           <h1 className="text-3xl font-bold">Your Assessment Results</h1>
+          {isDualModel && (
+            <div className="flex items-center gap-2 mt-2">
+              {result.image_provided ? (
+                <>
+                  <Camera className="w-4 h-4 text-green-600" />
+                  <Badge variant="default">Full Multimodal Analysis</Badge>
+                </>
+              ) : (
+                <>
+                  <Calculator className="w-4 h-4 text-blue-600" />
+                  <Badge variant="secondary">Statistical Analysis</Badge>
+                </>
+              )}
+              <span className="text-sm text-muted-foreground">
+                Patient ID: {result.patient_id}
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
+          {isDualModel && (
+            <GenerateReportButton
+              patientId={result.patient_id}
+              healthData={healthData}
+              images={result.image_provided ? undefined : null}
+            />
+          )}
           <Button variant="outline" size="sm">
             <Share2 className="w-4 h-4 mr-2" />
             Share
           </Button>
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            Download
-          </Button>
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Risk Score */}
-        <Card className="md:col-span-2">
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <RiskGauge score={result.risk_score} riskLevel={result.risk_level} />
-              <div className="flex-1 text-center md:text-left">
-                <h2 className="text-2xl font-bold mb-2">
-                  {result.risk_level === 'low' && 'Good News!'}
-                  {result.risk_level === 'moderate' && 'Attention Recommended'}
-                  {result.risk_level === 'high' && 'Action Required'}
-                </h2>
-                <p className="text-muted-foreground mb-4">
-                  {result.risk_level === 'low' &&
-                    'Your stroke risk assessment shows favorable results. Continue maintaining your healthy lifestyle.'}
-                  {result.risk_level === 'moderate' &&
-                    'Your assessment indicates some risk factors that could be improved. Consider consulting with a healthcare provider.'}
-                  {result.risk_level === 'high' &&
-                    'Your assessment shows elevated risk factors. We strongly recommend consulting with a healthcare professional soon.'}
-                </p>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground justify-center md:justify-start">
-                  <div className="flex items-center gap-1">
-                    <span className="font-medium">Confidence:</span>
-                    <span>{Math.round(result.confidence * 100)}%</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{Math.round(result.processing_time_ms)}ms</span>
-                  </div>
+      {/* Risk Score Overview */}
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <RiskGauge score={riskScore} riskLevel={riskLevel} />
+            <div className="flex-1 text-center md:text-left">
+              <h2 className="text-2xl font-bold mb-2">
+                {riskLevel === 'low' && 'Good News!'}
+                {riskLevel === 'moderate' && 'Attention Recommended'}
+                {riskLevel === 'high' && 'Action Required'}
+              </h2>
+              <p className="text-muted-foreground mb-4">
+                {riskLevel === 'low' &&
+                  'Your stroke risk assessment shows favorable results. Continue maintaining your healthy lifestyle.'}
+                {riskLevel === 'moderate' &&
+                  'Your assessment indicates some risk factors that could be improved. Consider consulting with a healthcare provider.'}
+                {riskLevel === 'high' &&
+                  'Your assessment shows elevated risk factors. We strongly recommend consulting with a healthcare professional soon.'}
+              </p>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground justify-center md:justify-start flex-wrap">
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Confidence:</span>
+                  <span>{Math.round(confidence * 100)}%</span>
                 </div>
+                <div className="flex items-center gap-1">
+                  <Clock className="w-4 h-4" />
+                  <span>{Math.round(processingTime)}ms</span>
+                </div>
+                {isDualModel && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">Statistical:</span>
+                      <span>{Math.round(result.statistical_results.risk_score * 100)}%</span>
+                    </div>
+                    {result.multimodal_results && (
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium">Multimodal:</span>
+                        <span>{Math.round(result.multimodal_results.risk_score * 100)}%</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Risk Factors */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Contributing Factors</CardTitle>
-            <CardDescription>
-              Health metrics that may contribute to your risk level
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RiskFactors factors={result.contributing_factors} />
-          </CardContent>
-        </Card>
+      {/* Tabbed Content for Dual Model */}
+      {isDualModel ? (
+        <Tabs defaultValue="summary" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="clinical">Clinical Evidence</TabsTrigger>
+            {result.multimodal_results && (
+              <TabsTrigger value="multimodal">Image Analysis</TabsTrigger>
+            )}
+          </TabsList>
 
-        {/* Recommendations */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recommendations</CardTitle>
-            <CardDescription>
-              Personalized suggestions based on your assessment
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Recommendations recommendations={result.recommendations} />
-          </CardContent>
-        </Card>
-      </div>
+          {/* Summary Tab */}
+          <TabsContent value="summary" className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Risk Factors */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Contributing Factors</CardTitle>
+                  <CardDescription>
+                    Health metrics that may contribute to your risk level
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RiskFactors factors={contributingFactors} />
+                </CardContent>
+              </Card>
+
+              {/* Recommendations */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recommendations</CardTitle>
+                  <CardDescription>
+                    Personalized suggestions based on your assessment
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Recommendations recommendations={recommendations} />
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Clinical Evidence Tab */}
+          <TabsContent value="clinical">
+            <ClinicalEvidence
+              statisticalResults={result.statistical_results}
+              explainability={result.multimodal_results?.explainability}
+              showMultimodal={result.image_provided}
+            />
+          </TabsContent>
+
+          {/* Multimodal Analysis Tab */}
+          {result.multimodal_results && (
+            <TabsContent value="multimodal" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Multimodal Analysis Results</CardTitle>
+                  <CardDescription>
+                    Combined analysis of facial expressions and health data
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-medium mb-2">Risk Metrics</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Risk Score:</span>
+                          <span className="font-medium">
+                            {Math.round(result.multimodal_results.risk_score * 100)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Confidence:</span>
+                          <span className="font-medium">
+                            {Math.round(result.multimodal_results.confidence * 100)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Processing Time:</span>
+                          <span className="font-medium">
+                            {Math.round(result.multimodal_results.processing_time_ms)}ms
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {result.multimodal_results.explainability?.clinical_summary && (
+                      <div>
+                        <h4 className="font-medium mb-2">AI Clinical Summary</h4>
+                        <ul className="space-y-1 text-sm">
+                          {result.multimodal_results.explainability.clinical_summary.map(
+                            (item, index) => (
+                              <li key={index} className="flex items-start gap-2">
+                                <span className="text-primary">-</span>
+                                <span>{item}</span>
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+        </Tabs>
+      ) : (
+        // Legacy display for non-dual-model results
+        <div className="grid md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Contributing Factors</CardTitle>
+              <CardDescription>
+                Health metrics that may contribute to your risk level
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RiskFactors factors={contributingFactors} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recommendations</CardTitle>
+              <CardDescription>
+                Personalized suggestions based on your assessment
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Recommendations recommendations={recommendations} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Disclaimer */}
-      <div className="mt-8 bg-slate-50 border rounded-lg p-4 text-sm text-slate-600">
+      <div className="mt-8 bg-slate-50 dark:bg-slate-900 border rounded-lg p-4 text-sm text-slate-600 dark:text-slate-400">
         <p className="font-medium mb-1">Medical Disclaimer</p>
         <p>
           This assessment is provided for educational and informational purposes only and is not

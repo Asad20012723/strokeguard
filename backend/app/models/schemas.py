@@ -3,7 +3,7 @@ Pydantic schemas for API request/response validation.
 """
 
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -172,3 +172,162 @@ class ErrorResponse(BaseModel):
 
     detail: str = Field(..., description="Error message")
     error_code: Optional[str] = Field(None, description="Error code if applicable")
+
+
+# ======================= Dual-Model System Schemas =======================
+
+class StatisticalPredictionRequest(BaseModel):
+    """Request for statistical (tabular-only) prediction."""
+
+    health_data: HealthData
+    include_statistics: bool = Field(
+        default=True,
+        description="Include detailed statistics (OR, p-values, CI)"
+    )
+
+
+class FeatureContribution(BaseModel):
+    """Detailed feature contribution from statistical model."""
+
+    value: float = Field(..., description="Feature value")
+    coefficient: float = Field(..., description="Model coefficient")
+    contribution: float = Field(..., description="Contribution to log-odds")
+    odds_ratio: float = Field(..., description="Odds ratio for this feature")
+    p_value: float = Field(..., description="Statistical significance")
+    ci_95: List[float] = Field(..., description="95% confidence interval [lower, upper]")
+    significant: bool = Field(..., description="Whether p < 0.05")
+
+
+class StatisticalPredictionResponse(BaseModel):
+    """Response from statistical model with full statistics."""
+
+    risk_score: float = Field(..., ge=0, le=1, description="Risk probability")
+    risk_level: RiskLevel = Field(..., description="Risk category")
+    odds_ratios: Dict[str, float] = Field(..., description="Odds ratios per feature")
+    p_values: Dict[str, float] = Field(..., description="P-values per feature")
+    std_errors: Dict[str, float] = Field(..., description="Standard errors per feature")
+    ci_lower: Dict[str, float] = Field(..., description="Lower 95% CI per feature")
+    ci_upper: Dict[str, float] = Field(..., description="Upper 95% CI per feature")
+    feature_contributions: Dict[str, FeatureContribution] = Field(
+        ..., description="Detailed feature contributions"
+    )
+    model_statistics: Dict[str, float] = Field(
+        ..., description="Model fit statistics (pseudo R2, AIC, etc.)"
+    )
+    interpretation: List[str] = Field(
+        default_factory=list, description="Clinical interpretation"
+    )
+    processing_time_ms: float = Field(..., description="Processing time in ms")
+
+
+class MultimodalPredictionRequest(BaseModel):
+    """Request for multimodal prediction with images."""
+
+    health_data: HealthData
+    images: ImageData
+    include_explainability: bool = Field(
+        default=True,
+        description="Include SHAP/LIME explanations"
+    )
+
+
+class ExplainabilityResults(BaseModel):
+    """SHAP and LIME explanation results."""
+
+    shap_values: Optional[Dict[str, Any]] = Field(
+        None, description="SHAP feature attributions"
+    )
+    lime_tabular: Optional[Dict[str, Any]] = Field(
+        None, description="LIME tabular explanations"
+    )
+    lime_image: Optional[Dict[str, Any]] = Field(
+        None, description="LIME image segmentation"
+    )
+    clinical_summary: List[str] = Field(
+        default_factory=list, description="Clinical interpretation summary"
+    )
+
+
+class MultimodalPredictionResponse(BaseModel):
+    """Response from multimodal model with explainability."""
+
+    risk_score: float = Field(..., ge=0, le=1, description="Risk probability")
+    risk_level: RiskLevel = Field(..., description="Risk category")
+    confidence: float = Field(..., ge=0, le=1, description="Model confidence")
+    contributing_factors: List[ContributingFactor] = Field(
+        default_factory=list, description="Risk factors"
+    )
+    recommendations: List[str] = Field(
+        default_factory=list, description="Health recommendations"
+    )
+    explainability: Optional[ExplainabilityResults] = Field(
+        None, description="SHAP/LIME explanations"
+    )
+    processing_time_ms: float = Field(..., description="Processing time in ms")
+
+
+class DualModelPredictionRequest(BaseModel):
+    """Request for dual-model prediction (optional images)."""
+
+    health_data: HealthData
+    images: Optional[ImageData] = Field(
+        None, description="Optional facial expression images"
+    )
+    include_statistics: bool = Field(
+        default=True, description="Include statistical analysis"
+    )
+    include_explainability: bool = Field(
+        default=True, description="Include SHAP/LIME explanations"
+    )
+
+
+class DualModelPredictionResponse(BaseModel):
+    """Combined response from both statistical and multimodal models."""
+
+    patient_id: str = Field(..., description="Generated patient session ID")
+    image_provided: bool = Field(..., description="Whether images were provided")
+
+    # Statistical model results (always available)
+    statistical_results: StatisticalPredictionResponse = Field(
+        ..., description="Logistic regression results"
+    )
+
+    # Multimodal results (only if images provided)
+    multimodal_results: Optional[MultimodalPredictionResponse] = Field(
+        None, description="Multimodal model results (if images provided)"
+    )
+
+    # Combined risk assessment
+    combined_risk_score: float = Field(
+        ..., ge=0, le=1, description="Combined risk score"
+    )
+    combined_risk_level: RiskLevel = Field(
+        ..., description="Combined risk category"
+    )
+    recommendations: List[str] = Field(
+        default_factory=list, description="Combined recommendations"
+    )
+    total_processing_time_ms: float = Field(
+        ..., description="Total processing time"
+    )
+
+
+class GenerateReportRequest(BaseModel):
+    """Request to generate medical report via n8n."""
+
+    patient_id: str = Field(..., description="Patient session ID")
+    health_data: HealthData
+    images: Optional[ImageData] = Field(None, description="Optional images")
+    report_format: str = Field(
+        default="pdf",
+        description="Report format: pdf, html, json"
+    )
+
+
+class GenerateReportResponse(BaseModel):
+    """Response from report generation."""
+
+    success: bool = Field(..., description="Whether report was generated")
+    report_url: Optional[str] = Field(None, description="URL to download report")
+    report_content: Optional[str] = Field(None, description="Report content (if inline)")
+    error: Optional[str] = Field(None, description="Error message if failed")

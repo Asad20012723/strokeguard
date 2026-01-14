@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { HealthFormData } from '@/types'
 
 const healthDataSchema = z.object({
@@ -26,10 +28,13 @@ const healthDataSchema = z.object({
 
 interface HealthDataFormProps {
   initialData: HealthFormData | null
-  onNext: (data: HealthFormData) => void
+  onNext: (data: HealthFormData, skipImages: boolean) => void
+  showSkipOption?: boolean
 }
 
-export function HealthDataForm({ initialData, onNext }: HealthDataFormProps) {
+export function HealthDataForm({ initialData, onNext, showSkipOption = false }: HealthDataFormProps) {
+  const [skipImages, setSkipImages] = useState(false)
+
   const {
     register,
     handleSubmit,
@@ -48,6 +53,10 @@ export function HealthDataForm({ initialData, onNext }: HealthDataFormProps) {
     },
   })
 
+  const onSubmit = (data: HealthFormData) => {
+    onNext(data, skipImages)
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -57,7 +66,7 @@ export function HealthDataForm({ initialData, onNext }: HealthDataFormProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onNext)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Age and Gender */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -173,8 +182,43 @@ export function HealthDataForm({ initialData, onNext }: HealthDataFormProps) {
             </div>
           </div>
 
+          {/* Skip Images Option */}
+          {showSkipOption && (
+            <div className="p-4 rounded-lg border bg-muted/50 space-y-3">
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  id="skipImages"
+                  checked={skipImages}
+                  onCheckedChange={(checked) => setSkipImages(checked === true)}
+                />
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="skipImages"
+                    className="text-sm font-medium leading-none cursor-pointer"
+                  >
+                    Skip Image Upload
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Get a statistical risk assessment using only health data (Logistic Regression)
+                  </p>
+                </div>
+              </div>
+
+              {skipImages && (
+                <div className="mt-2 p-3 rounded bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Statistical Analysis Mode:</strong> You will receive a detailed
+                    logistic regression analysis with odds ratios, p-values, and confidence
+                    intervals. For a more comprehensive assessment including facial expression
+                    analysis, uncheck this option.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <Button type="submit" className="w-full">
-            Continue to Image Capture
+            {skipImages ? 'Continue to Review' : 'Continue to Image Capture'}
           </Button>
         </form>
       </CardContent>
