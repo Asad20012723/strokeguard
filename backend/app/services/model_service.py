@@ -114,11 +114,16 @@ class ModelService:
             gender_encoded = int(gender)
         features.append(float(gender_encoded))
 
-        # Smoking status: 0, 1, or 2
+        # Smoking status: encode as two binary features (9 features total)
+        # smoking_former: 1 if former smoker, 0 otherwise
+        # smoking_current: 1 if current smoker, 0 otherwise
         smoking = health_data.get("smoking", 0)
         if hasattr(smoking, "value"):
             smoking = smoking.value
-        features.append(float(smoking))
+        smoking_former = 1.0 if smoking == 1 else 0.0
+        smoking_current = 1.0 if smoking == 2 else 0.0
+        features.append(smoking_former)
+        features.append(smoking_current)
 
         tensor = torch.tensor([features], dtype=torch.float32)
         return tensor.to(self.device)
@@ -131,7 +136,7 @@ class ModelService:
 
         Args:
             images: Preprocessed image tensor (1, 12, H, W)
-            tabular: Normalized tabular data tensor (1, 8)
+            tabular: Normalized tabular data tensor (1, 9)
 
         Returns:
             Dictionary with risk_score, risk_level, confidence, processing_time_ms

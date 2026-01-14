@@ -9,7 +9,7 @@ from app.models.schemas import HealthCheckResponse
 router = APIRouter()
 
 
-@router.get("/", response_model=HealthCheckResponse)
+@router.get("", response_model=HealthCheckResponse)
 async def health_check() -> HealthCheckResponse:
     """
     Health check endpoint for monitoring and load balancers.

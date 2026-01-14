@@ -5,7 +5,7 @@ Pydantic schemas for API request/response validation.
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class GenderEnum(str, Enum):
@@ -159,6 +159,8 @@ class PredictionResponse(BaseModel):
 
 class HealthCheckResponse(BaseModel):
     """Health check response."""
+
+    model_config = ConfigDict(protected_namespaces=())
 
     status: str = Field(..., description="Service status")
     model_loaded: bool = Field(..., description="Whether ML model is loaded")

@@ -49,7 +49,7 @@ class MultimodalModel(nn.Module):
     This architecture matches the trained model weights.
     """
 
-    def __init__(self, input_dim: int = 8):
+    def __init__(self, input_dim: int = 9):
         super(MultimodalModel, self).__init__()
         # Image dimensions: 640x480 -> after 2 pooling: 160x120
         # Output size: 32 channels * 160 * 120 = 614400
@@ -79,7 +79,7 @@ def load_model(model_path: str, device: str = "cpu") -> nn.Module:
     Returns:
         Loaded PyTorch model in eval mode
     """
-    model = MultimodalModel(input_dim=8)
+    model = MultimodalModel(input_dim=9)
 
     try:
         state_dict = torch.load(model_path, map_location=device, weights_only=True)
